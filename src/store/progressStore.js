@@ -1,5 +1,22 @@
 import { seedData } from '../data/seed';
 
+export const getActiveUser = () => {
+  return localStorage.getItem('russian_app_active_user') || null;
+};
+
+export const setActiveUser = (username) => {
+  if (username) {
+    localStorage.setItem('russian_app_active_user', username);
+  } else {
+    localStorage.removeItem('russian_app_active_user');
+  }
+};
+
+const getUserKey = (baseKey) => {
+  const user = getActiveUser();
+  return user ? `${user}_${baseKey}` : baseKey;
+};
+
 // SuperMemo-2 logic
 const calculateSM2 = (quality, prevInterval, prevEase, prevLapses, prevReps) => {
   let interval, ease, lapses, reps;
@@ -37,7 +54,7 @@ const calculateSM2 = (quality, prevInterval, prevEase, prevLapses, prevReps) => 
 };
 
 export const getProgressData = () => {
-  const data = localStorage.getItem('russian_app_progress');
+  const data = localStorage.getItem(getUserKey('russian_app_progress'));
   if (data) {
     return JSON.parse(data);
   }
@@ -45,11 +62,11 @@ export const getProgressData = () => {
 };
 
 export const saveProgressData = (data) => {
-  localStorage.setItem('russian_app_progress', JSON.stringify(data));
+  localStorage.setItem(getUserKey('russian_app_progress'), JSON.stringify(data));
 };
 
 export const getSettings = () => {
-  const data = localStorage.getItem('russian_app_settings');
+  const data = localStorage.getItem(getUserKey('russian_app_settings'));
   if (data) {
     return JSON.parse(data);
   }
@@ -62,7 +79,7 @@ export const getSettings = () => {
 };
 
 export const saveSettings = (settings) => {
-  localStorage.setItem('russian_app_settings', JSON.stringify(settings));
+  localStorage.setItem(getUserKey('russian_app_settings'), JSON.stringify(settings));
   applyTheme(settings.darkMode);
 };
 
@@ -74,10 +91,46 @@ export const applyTheme = (isDark) => {
   }
 };
 
-export const getAllCards = () => {
-    return seedData;
-}
+export const getCustomCards = () => {
+    const data = localStorage.getItem(getUserKey('russian_app_custom_cards'));
+    return data ? JSON.parse(data) : [];
+};
 
+export const saveCustomCards = (cards) => {
+    localStorage.setItem(getUserKey('russian_app_custom_cards'), JSON.stringify(cards));
+};
+
+export const getEditedData = () => {
+    const data = localStorage.getItem(getUserKey('russian_app_edited_cards'));
+    return data ? JSON.parse(data) : {};
+};
+
+export const saveEditedData = (data) => {
+    localStorage.setItem(getUserKey('russian_app_edited_cards'), JSON.stringify(data));
+};
+
+export const getDeletedCardIds = () => {
+    const data = localStorage.getItem(getUserKey('russian_app_deleted_cards'));
+    return data ? JSON.parse(data) : [];
+};
+
+export const saveDeletedCardIds = (ids) => {
+    localStorage.setItem(getUserKey('russian_app_deleted_cards'), JSON.stringify(ids));
+};
+
+export const getAllCards = () => {
+    const custom = getCustomCards();
+    const edited = getEditedData();
+    const deleted = getDeletedCardIds();
+    
+    const baseCards = seedData
+        .filter(c => !deleted.includes(c.id))
+        .map(c => edited[c.id] ? { ...c, ...edited[c.id] } : c);
+        
+    // Place recently added custom cards at the top
+    const reversedCustom = [...custom].reverse();
+    return [...reversedCustom, ...baseCards];
+}
 // Logic to get exactly what's due, or new items based on goals
 export const getDashboardStats = () => {
     const progress = getProgressData();
@@ -93,8 +146,10 @@ export const getDashboardStats = () => {
     // Group day string for streak tracking
     const todayStr = new Date().toDateString();
     
+    const allData = getAllCards();
+    
     // Process all cards
-    seedData.forEach(card => {
+    allData.forEach(card => {
         const cardProgress = progress[card.id];
         if (!cardProgress) {
             newCardsAvailable++;
@@ -118,29 +173,29 @@ export const getDashboardStats = () => {
 
     // Per-level counts for selection screen
     const levelCounts = {
-        fundamental: seedData.filter(c => c.level === 'fundamental' && !progress[c.id]).length,
-        b2: seedData.filter(c => c.level === 'b2' && !progress[c.id]).length,
-        advanced: seedData.filter(c => c.level === 'advanced' && !progress[c.id]).length,
+        fundamental: allData.filter(c => c.level === 'fundamental' && !progress[c.id]).length,
+        b2: allData.filter(c => c.level === 'b2' && !progress[c.id]).length,
+        advanced: allData.filter(c => c.level === 'advanced' && !progress[c.id]).length,
     };
 
-    let streak = localStorage.getItem('russian_app_streak') || 0;
+    let streak = localStorage.getItem(getUserKey('russian_app_streak')) || 0;
     streak = parseInt(streak, 10);
     
-    const lastStudied = localStorage.getItem('russian_app_last_studied');
+    const lastStudied = localStorage.getItem(getUserKey('russian_app_last_studied'));
     if (lastStudied !== todayStr) {
         // Did they miss yesterday?
         const yesterday = new Date();
         yesterday.setDate(yesterday.getDate() - 1);
         if (lastStudied !== yesterday.toDateString() && lastStudied !== todayStr && lastStudied) {
            streak = 0; // Streak broken
-           localStorage.setItem('russian_app_streak', 0);
+           localStorage.setItem(getUserKey('russian_app_streak'), 0);
         }
     }
 
     return {
         dueCount,
         newCardsAvailable: Math.min(settings.dailyNewGoal, newCardsAvailable),
-        totalCards: seedData.length,
+        totalCards: allData.length,
         totalMastered,
         streak,
         weakStats,
@@ -153,7 +208,9 @@ export const fetchDueCards = () => {
     const now = new Date().getTime();
     const dueCards = [];
 
-    seedData.forEach(card => {
+    const allData = getAllCards();
+
+    allData.forEach(card => {
         const cardProgress = progress[card.id];
         if (cardProgress && (cardProgress.status === 'learning' || cardProgress.status === 'review')) {
             if (cardProgress.due_at <= now) {
@@ -170,7 +227,9 @@ export const fetchNewCards = (level, limit) => {
     const progress = getProgressData();
     const newCards = [];
 
-    for (let card of seedData) {
+    const allData = getAllCards();
+
+    for (let card of allData) {
         if (!progress[card.id] && (!level || card.level === level)) {
             newCards.push(card);
             if (newCards.length >= limit) break;
@@ -244,9 +303,9 @@ export const submitReview = (cardId, rating) => {
 
     // Update streak if studying today
     const todayStr = new Date().toDateString();
-    const lastStudied = localStorage.getItem('russian_app_last_studied');
+    const lastStudied = localStorage.getItem(getUserKey('russian_app_last_studied'));
     if (lastStudied !== todayStr) {
-        let streak = parseInt(localStorage.getItem('russian_app_streak') || 0, 10);
+        let streak = parseInt(localStorage.getItem(getUserKey('russian_app_streak')) || 0, 10);
         const yesterday = new Date();
         yesterday.setDate(yesterday.getDate() - 1);
         
@@ -255,13 +314,13 @@ export const submitReview = (cardId, rating) => {
         } else {
             streak = 1; // Restart streak
         }
-        localStorage.setItem('russian_app_streak', streak);
-        localStorage.setItem('russian_app_last_studied', todayStr);
+        localStorage.setItem(getUserKey('russian_app_streak'), streak);
+        localStorage.setItem(getUserKey('russian_app_last_studied'), todayStr);
     }
 };
 
 export const resetProgress = () => {
-    localStorage.removeItem('russian_app_progress');
-    localStorage.removeItem('russian_app_streak');
-    localStorage.removeItem('russian_app_last_studied');
+    localStorage.removeItem(getUserKey('russian_app_progress'));
+    localStorage.removeItem(getUserKey('russian_app_streak'));
+    localStorage.removeItem(getUserKey('russian_app_last_studied'));
 }

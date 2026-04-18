@@ -5,9 +5,11 @@ import LearnNew from './screens/LearnNew';
 import ReviewFlow from './screens/ReviewFlow';
 import Library from './screens/Library';
 import Settings from './screens/Settings';
-import { getSettings, applyTheme } from './store/progressStore';
+import AccountLogin from './screens/AccountLogin';
+import { getSettings, applyTheme, getActiveUser } from './store/progressStore';
 
 function App() {
+  const [activeUser, setActiveUser] = useState(getActiveUser());
   const [currentScreen, setCurrentScreen] = useState('dashboard');
 
   useEffect(() => {
@@ -32,6 +34,10 @@ function App() {
         return <Dashboard setScreen={setCurrentScreen} />;
     }
   };
+
+  if (!activeUser) {
+    return <AccountLogin onLogin={(user) => setActiveUser(user)} />;
+  }
 
   return (
     <div className="container">

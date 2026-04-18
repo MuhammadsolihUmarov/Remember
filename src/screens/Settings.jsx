@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { getSettings, saveSettings, resetProgress } from '../store/progressStore';
-import { Moon, Sun, Languages, Trash2, RefreshCw } from 'lucide-react';
+import { getSettings, saveSettings, resetProgress, getActiveUser, setActiveUser } from '../store/progressStore';
+import { Moon, Sun, Languages, Trash2, RefreshCw, LogOut } from 'lucide-react';
 
 export default function Settings() {
     const [settings, setSettingsState] = useState(null);
@@ -30,9 +30,17 @@ export default function Settings() {
         }
     };
 
+    const handleLogout = () => {
+        setActiveUser(null);
+        window.location.reload();
+    };
+
     return (
-        <div className="screen animate-fade-in">
-            <h1 className="title-gradient mb-8">Settings</h1>
+        <div className="screen animate-fade-in" style={{ paddingBottom: '80px' }}>
+            <div className="flex justify-between items-center mb-8">
+                <h1 className="title-gradient">Settings</h1>
+                <span className="text-secondary" style={{ fontSize: '0.9rem' }}>Logged in as: <strong className="text-primary">{getActiveUser()}</strong></span>
+            </div>
 
             <div className="card mb-4">
                 <div className="flex justify-between items-center py-2">
@@ -97,11 +105,18 @@ export default function Settings() {
                 </div>
             </div>
 
-            <button className="btn btn-outline w-full text-danger border-danger flex items-center justify-center gap-2" 
+            <button className="btn btn-outline w-full text-danger border-danger flex items-center justify-center gap-2 mb-4" 
                     style={{ borderColor: 'var(--danger)', color: 'var(--danger)' }}
                     onClick={handleReset}>
                 <Trash2 size={18} />
                 Reset Progress
+            </button>
+
+            <button className="btn w-full flex items-center justify-center gap-2 bg-card-bg border border-border-color" 
+                    style={{ color: 'var(--text-primary)' }}
+                    onClick={handleLogout}>
+                <LogOut size={18} />
+                Log Out
             </button>
             
             <p className="text-center text-secondary mt-8 text-sm">

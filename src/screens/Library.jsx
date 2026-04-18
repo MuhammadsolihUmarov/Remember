@@ -1,11 +1,16 @@
 import React, { useState } from 'react';
-import { getAllCards } from '../store/progressStore';
-import { Search, Volume2, Filter } from 'lucide-react';
+import { getAllCards, getCustomCards, saveCustomCards, getEditedData, saveEditedData, getDeletedCardIds, saveDeletedCardIds } from '../store/progressStore';
+import { Search, Volume2, Filter, Plus, Edit2, Trash2 } from 'lucide-react';
 import { playRussianAudio } from '../utils/audio';
+import EditCardModal from '../components/EditCardModal';
 
 export default function Library() {
     const [searchTerm, setSearchTerm] = useState('');
     const [typeFilter, setTypeFilter] = useState('all');
+    const [refresh, setRefresh] = useState(0);
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [editingCard, setEditingCard] = useState(null);
+
     const cards = getAllCards();
 
     const filteredCards = cards.filter(card => {
@@ -15,9 +20,57 @@ export default function Library() {
         return matchesSearch && matchesType;
     });
 
+    const handleSaveCard = (cardData) => {
+        if (cardData.id.startsWith('custom_')) {
+            const customCards = getCustomCards();
+            const existingIndex = customCards.findIndex(c => c.id === cardData.id);
+            if (existingIndex >= 0) {
+                customCards[existingIndex] = cardData;
+            } else {
+                customCards.push(cardData);
+            }
+            saveCustomCards(customCards);
+        } else {
+            // Edited a seed card
+            const editedData = getEditedData();
+            editedData[cardData.id] = cardData;
+            saveEditedData(editedData);
+        }
+        setRefresh(prev => prev + 1);
+    };
+
+    const handleDelete = (id) => {
+        if (id.startsWith('custom_')) {
+            const customCards = getCustomCards();
+            saveCustomCards(customCards.filter(c => c.id !== id));
+        } else {
+            const deletedIds = getDeletedCardIds();
+            if (!deletedIds.includes(id)) {
+                deletedIds.push(id);
+                saveDeletedCardIds(deletedIds);
+            }
+        }
+        setRefresh(prev => prev + 1);
+    };
+
+    const openCreate = () => {
+        setEditingCard(null);
+        setIsModalOpen(true);
+    };
+
+    const openEdit = (card) => {
+        setEditingCard(card);
+        setIsModalOpen(true);
+    };
+
     return (
-        <div className="screen animate-fade-in">
-            <h1 className="title-gradient mb-6">Card Library</h1>
+        <div className="screen animate-fade-in" style={{ paddingBottom: '80px' }}>
+            <div className="flex justify-between items-center mb-6">
+                <h1 className="title-gradient">Card Library</h1>
+                <button className="btn btn-primary flex items-center gap-2" style={{ padding: '0.4rem 0.8rem', fontSize: '0.9rem' }} onClick={openCreate}>
+                    <Plus size={16} /> New Card
+                </button>
+            </div>
 
             <div className="flex gap-2 mb-6">
                 <div className="flex items-center bg-card-bg border border-border-color rounded-lg px-3 flex-1" style={{ background: 'var(--card-bg)' }}>
@@ -49,12 +102,22 @@ export default function Library() {
                         <div className="flex justify-between items-start">
                             <div>
                                 <span className="tag mb-2" style={{ fontSize: '0.6rem' }}>{card.type}</span>
+                                {card.level === 'b2' && <span className="tag mb-2 ml-2" style={{ fontSize: '0.6rem', background: '#3b82f633', color: '#60a5fa' }}>B2</span>}
+                                {card.level === 'advanced' && <span className="tag mb-2 ml-2" style={{ fontSize: '0.6rem', background: '#8b5cf633', color: '#a78bfa' }}>ADV</span>}
                                 <h3 className="cyrillic-text" style={{ fontSize: '1.2rem', marginBottom: '0.25rem' }}>{card.russian}</h3>
                                 <p className="text-secondary">{card.english}</p>
                             </div>
-                            <button className="btn-icon" onClick={() => playRussianAudio(card.russian)}>
-                                <Volume2 size={18} />
-                            </button>
+                            <div className="flex gap-2">
+                                <button className="btn-icon" onClick={() => openEdit(card)}>
+                                    <Edit2 size={18} style={{ color: 'var(--text-secondary)' }} />
+                                </button>
+                                <button className="btn-icon" onClick={() => handleDelete(card.id)}>
+                                    <Trash2 size={18} style={{ color: 'var(--text-secondary)' }} />
+                                </button>
+                                <button className="btn-icon" onClick={() => playRussianAudio(card.russian)}>
+                                    <Volume2 size={18} />
+                                </button>
+                            </div>
                         </div>
                     </div>
                 ))}
@@ -63,6 +126,13 @@ export default function Library() {
                     <p className="text-center text-secondary mt-8">No cards matching your criteria.</p>
                 )}
             </div>
+
+            <EditCardModal 
+                isOpen={isModalOpen} 
+                onClose={() => setIsModalOpen(false)} 
+                onSave={handleSaveCard} 
+                initialData={editingCard} 
+            />
         </div>
     );
 }
